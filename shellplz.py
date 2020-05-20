@@ -5,9 +5,10 @@ import json
 from instances import instances_map
 import time
 import subprocess
+import sys
 
 price_filter = "0.01" # 1c defaul
-OPTIONS = ["-i", "~/.ssh/Cron.pem"]
+OPTIONS = sys.argv[1:]
 
 session = boto3.session.Session()
 client = boto3.client('ec2')
@@ -106,13 +107,21 @@ while counter < 60:
 
 if len(spots) == 0:
     raise Exception("Couldnt find your spot instance. here is it described:\n\n" + str(client.describe_spot_instance_requests()))
+if len(spots) > 1:
+    print("Found multiple spot instances - have you run this multiple times? Guess i'll just try and grab one?")
+    spots = sorted(spots, key=lambda i: i['CreateTime'], reverse=True)  # Sort spots so newest is first
+    
 spot = spots[0]
 instance_created_id = spot['InstanceId']
 
 instance_created = client.describe_instances(InstanceIds=[instance_created_id])['Reservations'][0]['Instances'][0]
 public_ip = instance_created['PublicIpAddress']
 
-subprocess.call(["ssh", "ec2-user@" + public_ip] + OPTIONS)
+cmd = ["ssh", "ec2-user@" + public_ip] + OPTIONS
+print("Command running is:")
+print(cmd)
+
+subprocess.call(cmd)
 
 print()
 print("FINISHED WITH INSTANCE. Terminating now")
